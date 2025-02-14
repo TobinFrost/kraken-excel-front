@@ -1,3 +1,5 @@
+import { Product } from './product.model';
+
 export type ProductRawData = {
   Name: string;
   UpdatedOn: string;
@@ -6,7 +8,7 @@ export type ProductRawData = {
 };
 
 export default function ProductParser(raw: ProductRawData) {
-  const _product: any = {
+  const _product: Product = {
     name: '',
     updated_at: '',
     prices: [],
@@ -21,13 +23,15 @@ export default function ProductParser(raw: ProductRawData) {
       _product.rate = raw['Rate %'];
     }
     if (raw.Prices && raw.Prices !== 'prices') {
+      console.log(raw.Prices);
       if (typeof raw.Prices === 'number') {
-        raw.Prices = `${raw.Prices}`;
+        _product.prices = [raw.Prices];
+      } else {
+        _product.prices = raw.Prices.split(';').map((item) => {
+          const price = parseFloat(item.replace(',', '.'));
+          return price > 0 ? price : 0;
+        });
       }
-      _product.prices = raw.Prices.split(';').map((item) => {
-        const price = parseInt(item);
-        return price > 0 ? price : 0;
-      });
     }
     if (
       raw.UpdatedOn &&

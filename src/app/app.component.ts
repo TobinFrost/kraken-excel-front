@@ -1,5 +1,4 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
 import { UploaderService } from './uploader.service';
 import {
   FileSystemFileEntry,
@@ -7,10 +6,9 @@ import {
   NgxFileDropModule,
 } from 'ngx-file-drop';
 import * as XLSX from 'xlsx';
-import { BrowserModule } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
-import { HttpClientModule } from '@angular/common/http';
 import ProductParser from './data.parser';
+import { Product } from './product.model';
 
 @Component({
   selector: 'app-root',
@@ -22,6 +20,7 @@ export class AppComponent {
   excelData: any[] = [];
   headers: string[] = [];
   selectedFile: File | null = null;
+  extractedData: Product[] = [];
 
   constructor(private excelService: UploaderService) {}
 
@@ -49,12 +48,20 @@ export class AppComponent {
       const worksheet = workbook.Sheets[sheetName];
 
       const rawData = XLSX.utils.sheet_to_json(worksheet);
+      console.log('Raw data :', rawData);
       this.excelData = this.formatDates(rawData);
       for (let i = 0; i < this.excelData.length; i++) {
         const element = this.excelData[i];
-        const t = ProductParser(element);
-        console.log(t);
+        const parsedProduct = ProductParser(element);
+        if (parsedProduct) {
+          this.extractedData.push(parsedProduct);
+        }
+        console.log(parsedProduct);
       }
+      this.extractedData = this.removeDuplicateByName(this.extractedData);
+      this.extractedData = this.removeHeaderDataFromExtractedData(
+        this.extractedData
+      );
       this.headers = Object.keys(this.excelData[0] || {});
     };
 
@@ -64,12 +71,33 @@ export class AppComponent {
   private formatDates(data: any[]): any[] {
     return data.map((row) => {
       const formattedRow = { ...row };
-      Object.keys(formattedRow).forEach((key) => {
+      ['UpdatedOn', 'updated_on'].forEach((key) => {
         if (this.isDate(formattedRow[key])) {
           formattedRow[key] = this.formatDate(formattedRow[key]);
         }
       });
       return formattedRow;
+    });
+  }
+
+  private removeDuplicateByName(products: Product[]): Product[] {
+    const checked = new Set();
+    return products.filter((item) => {
+      const key = item.name;
+      if (key === undefined) {
+        return false;
+      }
+      if (checked.has(key)) {
+        return false;
+      }
+      checked.add(key);
+      return true;
+    });
+  }
+
+  private removeHeaderDataFromExtractedData(products: Product[]): Product[] {
+    return products.filter((product) => {
+      return product.name !== 'name';
     });
   }
 
@@ -84,8 +112,8 @@ export class AppComponent {
 
   uploadExcel() {
     if (this.selectedFile) {
-      this.excelService.uploadFile(this.selectedFile).subscribe((response) => {
-        console.log('Fichier envoyé avec succès', response);
+      this.excelService.uploadData(this.extractedData).subscribe((response) => {
+        console.log('Data sent successfully', response);
       });
     }
   }
